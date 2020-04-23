@@ -13,6 +13,7 @@ import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.BlockPos;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.common.config.Configuration;
+import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent.RightClickBlock;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.Mod.EventHandler;
@@ -23,12 +24,13 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 @Mod(
     modid = SignEdit.MODID,
     version = SignEdit.VERSION,
-    name = SignEdit.MODNAME
+    name = SignEdit.MODNAME,
+    acceptableRemoteVersions = "*"
 )
 public class SignEdit {
 
   public static final String MODID = "signedit";
-  public static final String VERSION = "1.12.2-4";
+  public static final String VERSION = "1.12.2-6";
   public static final String MODNAME = "SignEdit";
 
   private static final Item DEFAULT_EDITOR = Items.SIGN;
@@ -66,45 +68,18 @@ public class SignEdit {
   }
 
   @SubscribeEvent
-  public void editSign(RightClickBlock event) {
-    if (event.getEntityPlayer().isSneaking()) {
+  public void onPlayerInteract(PlayerInteractEvent.RightClickBlock event) {
+    if (event.getWorld().isRemote){
       return;
     }
 
-    if (!isHoldingEditor(event.getEntityPlayer())) {
-      return;
-    }
-
-    BlockPos pos = new BlockPos(event.getHitVec());
-    IBlockState state = event.getWorld().getBlockState(pos);
-
-    if (state.getBlock() != Blocks.WALL_SIGN && state.getBlock() != Blocks.STANDING_SIGN) {
-      return;
-    }
-
-    EntityPlayer player = event.getEntityPlayer();
-    TileEntity tileentity = event.getWorld().getTileEntity(pos);
-
-    if (tileentity instanceof TileEntitySign) {
-      TileEntitySign sign = (TileEntitySign) tileentity;
-      sign.setPlayer(player);
-      ObfuscationReflectionHelper.setPrivateValue(TileEntitySign.class, sign, true, "field_145916_j", "isEditable");
-      player.openEditSign(sign);
+    TileEntity te = event.getEntityPlayer().world.getTileEntity(event.getPos());
+    if (te != null && te instanceof TileEntitySign
+        && event.getEntityPlayer().isSneaking()
+        && event.getEntityPlayer().getHeldItemMainhand() != ItemStack.EMPTY
+        && event.getEntityPlayer().getHeldItemMainhand().getItem().equals(editor)) {
+      event.getEntityPlayer().openEditSign((TileEntitySign) te);
+      event.setCanceled(true);
     }
   }
-
-  private static boolean isHoldingEditor(EntityPlayer player) {
-    if (editor == null) {
-      return true;
-    }
-    
-    for (ItemStack stack : player.getHeldEquipment()) {
-      if (stack.getItem() == editor) {
-        return true;
-      }
-    }
-    
-    return false;
-  }
-
 }
